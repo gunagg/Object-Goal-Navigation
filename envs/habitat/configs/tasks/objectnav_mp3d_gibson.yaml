@@ -1,5 +1,5 @@
 ENVIRONMENT:
-  MAX_EPISODE_STEPS: 500
+  MAX_EPISODE_STEPS: 5000
 SIMULATOR:
   TURN_ANGLE: 30
   TILT_ANGLE: 30
@@ -10,7 +10,7 @@ SIMULATOR:
     RADIUS: 0.18
   HABITAT_SIM_V0:
     GPU_DEVICE_ID: 0
-    ALLOW_SLIDING: True
+    ALLOW_SLIDING: False 
   SEMANTIC_SENSOR:
     WIDTH: 640
     HEIGHT: 480
@@ -37,9 +37,10 @@ TASK:
     SUCCESS_DISTANCE: 0.2
 
 DATASET:
-  TYPE: PointNav-v1
+  TYPE: ObjectNav-v2
   SPLIT: train
-  DATA_PATH: "data/datasets/objectnav/gibson/v1/{split}/{split}.json.gz"
-  EPISODES_DIR: "data/datasets/objectnav/gibson/v1/{split}/"
+  DATA_PATH: "data/datasets/objectnav_mp3d_sample/{split}/{split}.json.gz"
+  EPISODES_DIR: "data/datasets/objectnav_mp3d_sample/{split}/"
   SCENES_DIR: "data/scene_datasets/"
+  MAX_REPLAY_BUFFER_STEPS: 2000
   # CONTENT_SCENES: ["Allensville.glb", "Pomaria.glb"]

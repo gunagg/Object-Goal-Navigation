@@ -31,7 +31,6 @@ class ObjectGoal_Env(habitat.RLEnv):
         self.split = config_env.DATASET.SPLIT
         self.episodes_dir = config_env.DATASET.EPISODES_DIR.format(
             split=self.split)
-        logger.info("episodes: {}".format(self.episodes_dir))
 
         dataset_info_file = self.episodes_dir + \
             "{split}_info.pbz2".format(split=self.split)
@@ -457,10 +456,10 @@ class ObjectGoal_Env(habitat.RLEnv):
         self.info['goal_cat_id'] = self.goal_idx
         self.info['goal_name'] = self.goal_name
 
-        # spl, success, dist = self.get_metrics()
-        # self.info['distance_to_goal'] = dist
-        # self.info['spl'] = spl
-        # self.info['success'] = success
+        spl, success, dist = self.get_metrics()
+        self.info['distance_to_goal'] = dist
+        self.info['spl'] = spl
+        self.info['success'] = success
 
         return obs, self.info
 

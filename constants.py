@@ -53,6 +53,27 @@ coco_categories = {
     "bottle": 14
 }
 
+
+coco_categories_to_mp3d = {
+    "chair": 3,
+    "couch": 10,
+    "potted plant": 14,
+    "bed": 11,
+    "toilet": 18,
+    "tv": 22,
+    "dining-table": 5,
+}
+
+coco_categories_to_task_category_id = {
+    "chair": 0,
+    "couch": 5,
+    "potted plant": 8,
+    "bed": 6,
+    "toilet": 10,
+    "tv": 13,
+    "dining-table": 1,
+}
+
 coco_categories_mapping = {
     56: 0,  # chair
     57: 1,  # couch

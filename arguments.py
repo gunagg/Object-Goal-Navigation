@@ -11,11 +11,11 @@ def get_args():
                         help='random seed (default: 1)')
     parser.add_argument('--auto_gpu_config', type=int, default=1)
     parser.add_argument('--total_num_scenes', type=str, default="auto")
-    parser.add_argument('-n', '--num_processes', type=int, default=5,
+    parser.add_argument('-n', '--num_processes', type=int, default=1,
                         help="""how many training processes to use (default:5)
                                 Overridden when auto_gpu_config=1
                                 and training on gpus""")
-    parser.add_argument('--num_processes_per_gpu', type=int, default=6)
+    parser.add_argument('--num_processes_per_gpu', type=int, default=1)
     parser.add_argument('--num_processes_on_first_gpu', type=int, default=1)
     parser.add_argument('--eval', type=int, default=0,
                         help='0: Train, 1: Evaluate (default: 0)')
@@ -96,7 +96,7 @@ def get_args():
                         help="dataset version")
 
     # Model Hyperparameters
-    parser.add_argument('--agent', type=str, default="sem_exp")
+    parser.add_argument('--agent', type=str, default="object_goal")
     parser.add_argument('--lr', type=float, default=2.5e-5,
                         help='learning rate (default: 2.5e-5)')
     parser.add_argument('--global_hidden_size', type=int, default=256,
@@ -148,6 +148,8 @@ def get_args():
     parser.add_argument('--map_pred_threshold', type=float, default=1.0)
     parser.add_argument('--exp_pred_threshold', type=float, default=1.0)
     parser.add_argument('--collision_threshold', type=float, default=0.20)
+    parser.add_argument('--output_path', type=str, default=None)
+    parser.add_argument('--num_scenes', type=int, default=None)
 
     # parse arguments
     args = parser.parse_args()

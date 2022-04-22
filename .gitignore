@@ -142,3 +142,10 @@ tmp/
 pretrained_models/
 data/
 data
+
+# Data/assets
+ckpt/
+demos/
+habitat-lab/
+habitat-sim/
+objectnav/
