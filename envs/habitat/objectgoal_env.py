@@ -13,6 +13,7 @@ from habitat_sim.utils.common import quat_to_coeffs, quat_from_coeffs
 from envs.utils.fmm_planner import FMMPlanner
 from constants import coco_categories
 import envs.utils.pose as pu
+import clip
 
 
 class ObjectGoal_Env(habitat.RLEnv):
@@ -357,6 +358,7 @@ class ObjectGoal_Env(habitat.RLEnv):
         # print(self.sim_continuous_to_sim_map(self.get_sim_location()))
 
         obs = self._env.sim.get_observations_at(pos, rot)
+        print("obs keys, ", obs.keys())
         goals = self.get_goal_positions(goal_idx)
 
         self._current_episode_new = {
@@ -444,6 +446,7 @@ class ObjectGoal_Env(habitat.RLEnv):
         rgb = obs['rgb'].astype(np.uint8)
         depth = obs['depth']
         obs["objectgoal"] = self.goal_idx
+        obs["objectgoalprompt"] = clip.tokenize(self.goal_name, context_length=77).numpy()
 
         state = np.concatenate((rgb, depth), axis=2).transpose(2, 0, 1)
         self.last_sim_location = self.get_sim_location()
@@ -507,6 +510,7 @@ class ObjectGoal_Env(habitat.RLEnv):
         last_sim_location = self.get_sim_location()
         obs["gps"] = [last_sim_location[0], -last_sim_location[1]]
         obs["compass"] = last_sim_location[2]
+        obs["objectgoalprompt"] = clip.tokenize(self.goal_name, context_length=77).numpy()
         state = np.concatenate((rgb, depth), axis=2).transpose(2, 0, 1)
 
         self.timestep += 1

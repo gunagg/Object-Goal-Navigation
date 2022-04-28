@@ -16,10 +16,9 @@ import algo
 
 from habitat import logger
 
-from src import POLICY_CLASSES
+from zson import POLICY_CLASSES
 from src.default import get_config
 from src.models.common import batch_obs
-from src.models.rednet import load_rednet
 
 from gym.spaces import Discrete, Dict, Box
 
@@ -115,13 +114,13 @@ def main():
 
     # Set up HabOnWeb models
     config_paths = "envs/habitat/configs/tasks/objectnav_gibson.yaml"
-    DEFAULT_CONFIG = "habitat_configs/il_objectnav_sem_seg_ft.yaml"
+    DEFAULT_CONFIG = "habitat_configs/zson/objectnav_mp3d.yaml"
     config = get_config([DEFAULT_CONFIG, DEFAULT_CONFIG],
                 ['BASE_TASK_CONFIG_PATH', config_paths]).clone()
 
     ckpt_dict = torch.load(args.load, map_location=device)["state_dict"]
     ckpt_dict = {
-        k.replace("model.", ""): v
+        k.replace("actor_critic.", ""): v
         for k, v in ckpt_dict.items()
     }
     ckpt_dict = {
@@ -132,9 +131,6 @@ def main():
     # Config
     config = config
     config = config.clone()
-    model_cfg = config.MODEL
-    il_cfg = config.IL.BehaviorCloning
-    task_cfg = config.TASK_CONFIG.TASK
 
     # Load spaces (manually)
     spaces = {
@@ -163,54 +159,37 @@ def main():
             shape=(2,), # Spoof for model to be shaped correctly
             dtype=np.float32,
         ),
-        "compass": Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float)
+        "compass": Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float),
+        "objectgoalprompt": Box(low=0, high=np.inf, shape=(77,), dtype=np.int64)
     }
 
-    observation_spaces = Dict(spaces)
-    if 'action_distribution.linear.bias' in ckpt_dict:
-        num_acts = ckpt_dict['action_distribution.linear.bias'].size(0)
-    action_spaces = Discrete(num_acts)
+    observation_space = Dict(spaces)
 
-    is_objectnav = "ObjectNav" in task_cfg.TYPE
-    additional_sensors = []
-    embed_goal = False
-    if is_objectnav:
-        additional_sensors = ["gps", "compass"]
-        embed_goal = True
+    num_acts = 4
+    action_space = Discrete(num_acts)
 
-    policy_class = POLICY_CLASSES[il_cfg.POLICY.name]
-    model = policy_class(
-        observation_space=observation_spaces,
-        action_space=action_spaces,
-        model_config=model_cfg,
-        device=device,
-        goal_sensor_uuid="objectgoal",
-        additional_sensors=additional_sensors,
-    ).to(device)
 
-    model.load_state_dict(ckpt_dict, strict=True)
-    model.eval()
+    policy_class = POLICY_CLASSES[config.RL.POLICY.name]
+    actor_critic = policy_class.from_config(
+        config=config,
+        observation_space=observation_space,
+        action_space=action_space
+    )
+    actor_critic.to(device)
 
-    semantic_predictor = None
+    actor_critic.load_state_dict(ckpt_dict, strict=True)
+    actor_critic.eval()
 
-    if model_cfg.USE_SEMANTICS:
-        # logger.info("setting up sem seg predictor")
-        semantic_predictor = load_rednet(
-            device,
-            ckpt=model_cfg.SEMANTIC_ENCODER.rednet_ckpt,
-            resize=True, # since we train on half-vision
-            num_classes=model_cfg.SEMANTIC_ENCODER.num_classes
-        )
-        semantic_predictor.eval()
     logger.info("Model setup Done!")
 
     # Load other items
     test_recurrent_hidden_states = torch.zeros(
-        model_cfg.STATE_ENCODER.num_recurrent_layers,
         1, # num_processes
-        model_cfg.STATE_ENCODER.hidden_size,
+        actor_critic.net.num_recurrent_layers,
+        config.RL.POLICY.hidden_size,
         device=device,
     )
+    logger.info("hiiden states: {}".format(test_recurrent_hidden_states.shape))
     done = torch.zeros(args.num_processes, device=device, dtype=torch.bool)
     not_done_masks = torch.zeros(args.num_processes, 1, device=device, dtype=torch.bool)
     prev_actions = torch.zeros(
@@ -243,22 +222,15 @@ def main():
                 wait_env[e] = 1.
 
         with torch.no_grad():
-            if semantic_predictor is not None:
-                batch["semantic"] = semantic_predictor(batch["rgb"], batch["depth"])
-                if model_cfg.SEMANTIC_ENCODER.is_thda:
-                    batch["semantic"] = batch["semantic"] - 1
-            (
-                logits,
-                test_recurrent_hidden_states,
-            ) = model(
-                batch,
-                test_recurrent_hidden_states,
-                prev_actions,
-                not_done_masks,
-            )
+            (_, actions, _, test_recurrent_hidden_states,) = actor_critic.act(
+                    batch,
+                    test_recurrent_hidden_states,
+                    prev_actions,
+                    not_done_masks,
+                    deterministic=False,
+                )
 
-            actions = torch.argmax(logits, dim=1)
-            prev_actions.copy_(actions.unsqueeze(1))  # type: ignore
+            prev_actions.copy_(actions)  # type: ignore
 
 
         obs, _, done, infos = envs.step(actions)

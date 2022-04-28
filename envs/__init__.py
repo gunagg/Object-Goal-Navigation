@@ -16,6 +16,8 @@ class VecPyTorch():
     def __init__(self, venv, device):
         self.venv = venv
         self.num_envs = venv.num_envs
+        self.observation_spaces = venv.observation_spaces
+        self.action_spaces = venv.action_spaces
         self.observation_space = venv.observation_space
         self.action_space = venv.action_space
         self.device = device

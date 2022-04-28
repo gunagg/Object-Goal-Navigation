@@ -16,76 +16,48 @@ from .models.resnet_encoders import (
 )
 from .models.rnn_state_encoder import RNNStateEncoder
 from .models.running_mean_and_var import RunningMeanAndVar
-from .models.common import CategoricalNet, CustomFixedCategorical
+from .models.common import CategoricalNet, CustomFixedCategorical, GaussianNet
 
 from habitat import Config
 
 
-class Policy(nn.Module):
 
-    # The following configurations are used in the trainer to create the appropriate rollout
-    # As well as the appropriate auxiliary task wiring
-    # Whether to use multiple beliefs
-    IS_MULTIPLE_BELIEF = False
-    # Whether to section a single belief for auxiliary tasks, keeping a single GRU core
-    IS_SECTIONED = False
-    # Whether the fusion module is an RNN (see RecurrentAttentivePolicy)
-    IS_RECURRENT = False
-    # Has JIT support
-    IS_JITTABLE = False
-    # Policy fuses multiple inputs
-    LATE_FUSION = True
+class Policy(nn.Module, metaclass=abc.ABCMeta):
+    action_distribution: nn.Module
 
-    def __init__(self, net, dim_actions, observation_space=None, config=None, **kwargs):
+    def __init__(self, net, dim_actions, policy_config=None):
         super().__init__()
         self.net = net
         self.dim_actions = dim_actions
+        self.action_distribution: Union[CategoricalNet, GaussianNet]
 
-        actor_head_layers = getattr(config, "ACTOR_HEAD_LAYERS", 1)
-        critic_head_layers = getattr(config, "CRITIC_HEAD_LAYERS", 1)
+        if policy_config is None:
+            self.action_distribution_type = "categorical"
+        else:
+            self.action_distribution_type = (
+                policy_config.action_distribution_type
+            )
 
-        self.action_distribution = CategoricalNet(
-            self.net.output_size, self.dim_actions, layers=actor_head_layers
-        )
-        self.critic = CriticHead(self.net.output_size, layers=critic_head_layers)
-        if "rgb" in observation_space.spaces:
-            self.running_mean_and_var = RunningMeanAndVar(
-                observation_space.spaces["rgb"].shape[-1]
-                + (
-                    observation_space.spaces["depth"].shape[-1]
-                    if "depth" in observation_space.spaces
-                    else 0
-                ),
-                initial_count=1e4,
+        if self.action_distribution_type == "categorical":
+            self.action_distribution = CategoricalNet(
+                self.net.output_size, self.dim_actions
+            )
+        elif self.action_distribution_type == "gaussian":
+            self.action_distribution = GaussianNet(
+                self.net.output_size,
+                self.dim_actions,
+                policy_config.ACTION_DIST,
             )
         else:
-            self.running_mean_and_var = None
+            ValueError(
+                f"Action distribution {self.action_distribution_type}"
+                "not supported."
+            )
+
+        self.critic = CriticHead(self.net.output_size)
 
     def forward(self, *x):
         raise NotImplementedError
-
-    def _preprocess_obs(self, observations):
-        dtype = next(self.parameters()).dtype
-        observations = {k: v.to(dtype=dtype) for k, v in observations.items()}
-         # since this seems to be what running_mean_and_var is expecting
-        observations = {k: v.permute(0, 3, 1, 2) if len(v.size()) == 4 else v for k, v in observations.items()}
-        observations = _process_depth(observations)
-
-        if "rgb" in observations:
-            rgb = observations["rgb"].to(dtype=next(self.parameters()).dtype) / 255.0
-            x = [rgb]
-            if "depth" in observations:
-                x.append(observations["depth"])
-
-            x = self.running_mean_and_var(torch.cat(x, 1))
-            # this preprocesses depth and rgb, but not semantics. we're still embedding that in our encoder
-            observations["rgb"] = x[:, 0:3]
-            if "depth" in observations:
-                observations["depth"] = x[:, 3:]
-        # ! Permute them back, because the rest of our code expects unpermuted
-        observations = {k: v.permute(0, 2, 3, 1) if len(v.size()) == 4 else v for k, v in observations.items()}
-
-        return observations
 
     def act(
         self,
@@ -94,9 +66,7 @@ class Policy(nn.Module):
         prev_actions,
         masks,
         deterministic=False,
-        **kwargs
     ):
-        observations = self._preprocess_obs(observations)
         features, rnn_hidden_states = self.net(
             observations, rnn_hidden_states, prev_actions, masks
         )
@@ -104,15 +74,19 @@ class Policy(nn.Module):
         value = self.critic(features)
 
         if deterministic:
-            action = distribution.mode()
+            if self.action_distribution_type == "categorical":
+                action = distribution.mode()
+            elif self.action_distribution_type == "gaussian":
+                action = distribution.mean
         else:
+            print(distribution)
             action = distribution.sample()
+
         action_log_probs = distribution.log_probs(action)
 
         return value, action, action_log_probs, rnn_hidden_states
 
     def get_value(self, observations, rnn_hidden_states, prev_actions, masks):
-        observations = self._preprocess_obs(observations)
         features, _ = self.net(
             observations, rnn_hidden_states, prev_actions, masks
         )
@@ -121,7 +95,6 @@ class Policy(nn.Module):
     def evaluate_actions(
         self, observations, rnn_hidden_states, prev_actions, masks, action
     ):
-        observations = self._preprocess_obs(observations)
         features, rnn_hidden_states = self.net(
             observations, rnn_hidden_states, prev_actions, masks
         )
@@ -129,30 +102,26 @@ class Policy(nn.Module):
         value = self.critic(features)
 
         action_log_probs = distribution.log_probs(action)
-        distribution_entropy = distribution.entropy().mean()
+        distribution_entropy = distribution.entropy()
 
-        return value, action_log_probs, distribution_entropy, rnn_hidden_states, features, None, None, None
+        return value, action_log_probs, distribution_entropy, rnn_hidden_states
+
+    @classmethod
+    @abc.abstractmethod
+    def from_config(cls, config, observation_space, action_space):
+        pass
 
 
 class CriticHead(nn.Module):
-    HIDDEN_SIZE = 32
-    def __init__(self, input_size, layers=1):
+    def __init__(self, input_size):
         super().__init__()
-        if layers == 1:
-            self.fc = nn.Linear(input_size, 1)
-            nn.init.orthogonal_(self.fc.weight)
-            nn.init.constant_(self.fc.bias, 0)
-        else: # Only support 2 layers max
-            self.fc = nn.Sequential(
-                nn.Linear(input_size, self.HIDDEN_SIZE),
-                nn.ReLU(),
-                nn.Linear(self.HIDDEN_SIZE, 1)
-            )
-            nn.init.orthogonal_(self.fc[0].weight)
-            nn.init.constant_(self.fc[0].bias, 0)
+        self.fc = nn.Linear(input_size, 1)
+        nn.init.orthogonal_(self.fc.weight)
+        nn.init.constant_(self.fc.bias, 0)
 
     def forward(self, x):
         return self.fc(x)
+
 
 class Net(nn.Module, metaclass=abc.ABCMeta):
     @abc.abstractmethod
