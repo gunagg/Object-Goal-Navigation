@@ -139,13 +139,6 @@ def main():
             shape=(1,),
             dtype=np.int64
         ),
-        "depth": Box(
-            low=0,
-            high=1,
-            shape=(config.TASK_CONFIG.SIMULATOR.DEPTH_SENSOR.HEIGHT,
-                    config.TASK_CONFIG.SIMULATOR.DEPTH_SENSOR.WIDTH, 1),
-            dtype=np.float32,
-        ),
         "rgb": Box(
             low=0,
             high=255,
@@ -153,13 +146,6 @@ def main():
                     config.TASK_CONFIG.SIMULATOR.RGB_SENSOR.WIDTH, 3),
             dtype=np.uint8,
         ),
-        "gps": Box(
-            low=np.finfo(np.float32).min,
-            high=np.finfo(np.float32).max,
-            shape=(2,), # Spoof for model to be shaped correctly
-            dtype=np.float32,
-        ),
-        "compass": Box(low=-np.pi, high=np.pi, shape=(1,), dtype=np.float),
         "objectgoalprompt": Box(low=0, high=np.inf, shape=(77,), dtype=np.int64)
     }
 
