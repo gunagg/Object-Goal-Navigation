@@ -219,13 +219,14 @@ def main():
             prev_actions.copy_(actions)  # type: ignore
 
 
-        obs, _, done, infos = envs.step(actions)
+        step_data = [a.item() for a in actions.to(device="cpu")]
+        obs, _, done, infos = envs.step(step_data)
         batch = batch_obs(obs, device=device)
 
 
         not_done_masks = torch.tensor(
             [[0.0] if x else [1.0] for x in done],
-            dtype=torch.float,
+            dtype=torch.bool,
             device=device,
         )
 

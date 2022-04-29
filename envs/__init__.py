@@ -42,7 +42,7 @@ class VecPyTorch():
         return obs, reward, done, info
 
     def step(self, actions):
-        actions = actions.cpu().numpy()
+        # actions = actions.cpu().numpy()
         obs, reward, done, info = self.venv.step(actions)
         #obs = torch.from_numpy(obs).float().to(self.device)
         reward = torch.from_numpy(reward).float()

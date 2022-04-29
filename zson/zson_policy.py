@@ -162,7 +162,6 @@ class ZSONPolicyNet(Net):
         x.append(rgb)
 
         # goal embedding
-        print(ObjectGoalPromptSensor.cls_uuid, observations.keys())
         if ObjectGoalPromptSensor.cls_uuid in observations:
             goal = observations[ObjectGoalPromptSensor.cls_uuid]  # TN x 1 x F
             GV = goal.size(1)
