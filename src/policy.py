@@ -79,7 +79,6 @@ class Policy(nn.Module, metaclass=abc.ABCMeta):
             elif self.action_distribution_type == "gaussian":
                 action = distribution.mean
         else:
-            print(distribution)
             action = distribution.sample()
 
         action_log_probs = distribution.log_probs(action)

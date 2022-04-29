@@ -358,7 +358,6 @@ class ObjectGoal_Env(habitat.RLEnv):
         # print(self.sim_continuous_to_sim_map(self.get_sim_location()))
 
         obs = self._env.sim.get_observations_at(pos, rot)
-        print("obs keys, ", obs.keys())
         goals = self.get_goal_positions(goal_idx)
 
         self._current_episode_new = {
