@@ -45,4 +45,4 @@ DATASET:
   DATA_PATH: "data/datasets/objectnav/gibson/v1/{split}/{split}.json.gz"
   EPISODES_DIR: "data/datasets/objectnav/gibson/v1/{split}/"
   SCENES_DIR: "data/scene_datasets/"
-  # CONTENT_SCENES: ["Allensville.glb", "Pomaria.glb"]
+  # CONTENT_SCENES: ["Collierville.glb", "Corozal.glb"]
