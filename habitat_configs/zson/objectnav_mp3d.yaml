@@ -36,7 +36,7 @@ RL:
     rnn_type: "LSTM"
     rnn_num_layers: 2
 
-    CLIP_MODEL: "ViT-L/14"
+    CLIP_MODEL: "RN50"
     use_data_aug: True
     use_hot_cold_goals: False
     use_hot_cold_goals_with_emb: False

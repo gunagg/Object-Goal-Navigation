@@ -99,6 +99,11 @@ class ObjectGoal_Env(habitat.RLEnv):
             with gzip.open(episodes_file, 'r') as f:
                 self.eps_data = json.loads(
                     f.read().decode('utf-8'))["episodes"]
+            
+            cats = []
+            for ep in self.eps_data:
+                cats.append(ep['object_category'])
+            print("cats", set(cats))
 
             self.eps_data_idx = 0
             self.last_scene_path = self.scene_path
@@ -417,7 +422,9 @@ class ObjectGoal_Env(habitat.RLEnv):
                          evaluation metric info
         """
         args = self.args
-        new_scene = self.episode_no % args.num_train_episodes == 0
+        # new_scene = self.episode_no % args.num_train_episodes == 0
+
+        new_scene = self.episode_no % args.num_eval_episodes == 0
 
         self.episode_no += 1
 
@@ -438,8 +445,8 @@ class ObjectGoal_Env(habitat.RLEnv):
             obs = self.load_new_episode()
         # elif self.split == "replay":
         #     obs = self.load_replay_episode()
-        else:
-            obs = self.load_replay_episode()
+        # else:
+        #     obs = self.load_replay_episode()
             # obs = self.generate_new_episode()
 
         rgb = obs['rgb'].astype(np.uint8)
@@ -458,6 +465,8 @@ class ObjectGoal_Env(habitat.RLEnv):
         self.info['sensor_pose'] = [0., 0., 0.]
         self.info['goal_cat_id'] = self.goal_idx
         self.info['goal_name'] = self.goal_name
+        episode = self.eps_data[self.eps_data_idx]
+        print("on reset: episode id: {}, scene id: {}, category: {}".format(episode["episode_id"], episode["scene_id"], self.goal_name))
 
         # spl, success, dist = self.get_metrics()
         # self.info['distance_to_goal'] = dist
@@ -486,6 +495,7 @@ class ObjectGoal_Env(habitat.RLEnv):
             self.stopped = True
             # Not sending stop to simulator, resetting manually
             action = 3
+        # self.stopped = True
 
         obs, rew, done, _ = super().step(action)
 
@@ -497,6 +507,7 @@ class ObjectGoal_Env(habitat.RLEnv):
         spl, success, dist = 0., 0., 0.
 
         if done:
+            print("reset", self.info['goal_name'], self.timestep)
             spl, success, dist = self.get_metrics()
             self.info['distance_to_goal'] = dist
             self.info['spl'] = spl
@@ -514,6 +525,7 @@ class ObjectGoal_Env(habitat.RLEnv):
 
         self.timestep += 1
         self.info['time'] = self.timestep
+        print("Step: {}, {}, {}".format(self.timestep, self.eps_data[self.eps_data_idx]['episode_id'], self.eps_data[self.eps_data_idx]['scene_id']))
 
         return obs, rew, done, self.info
 
